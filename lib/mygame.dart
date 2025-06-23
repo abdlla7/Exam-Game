@@ -16,46 +16,74 @@ class MyGame extends FlameGame with HasCollisionDetection {
   int totalEnemiesToSpawn = 50;
   int enemiesSpawned = 0;
 
-  @override
-  late BuildContext buildContext;
+  late BuildContext buildContext; // Keep this if used for navigation, ensure it's valid
 
-  @override
-  late Sprite backgroundSprite;
+  // late Sprite backgroundSprite; // No longer needed as direct field if loaded and used in onLoad
 
   @override
   Future<void> onLoad() async {
+    debugPrint("[MyGame] onLoad started.");
     await super.onLoad();
 
-    backgroundSprite = await loadSprite('background.png');
-  }
-
-  @override
-  void onMount() {
-    super.onMount();
-
-    final screenSize = size;
-
+    // Load assets directly here
+    final bgSprite = await loadSprite('background.png');
     background = SpriteComponent(
-      sprite: backgroundSprite,
-      size: screenSize,
+      sprite: bgSprite,
+      size: size, // Size might not be correct here yet, onGameResize is better
       anchor: Anchor.topLeft,
     );
     add(background!);
+    debugPrint("[MyGame] Background loaded and added.");
 
     player = Player();
-    add(player!);
+    await add(player!); // Ensure player's onLoad completes
     ammoNotifier.value = player!.ammo;
+    debugPrint("[MyGame] Player loaded and added. Ammo: ${player!.ammo}");
 
-    addAll([
+    // Consider moving Spawner setup to onGameResize or after initial size is known
+    // For now, let's assume size is available or they adapt.
+    final screenSize = size; // size should be available after super.onLoad
+     addAll([
       EnemySpawner(
         spawnPosition: Vector2(screenSize.x - 10, screenSize.y - 50),
         spawnInterval: 2.0,
         createEnemy: () => EnemyMelee(),
       ),
-      // باقي السبونرز ...
+       EnemySpawner(
+        spawnPosition: Vector2(0, screenSize.y - 50),
+        spawnInterval: 3.0,
+        createEnemy: () => EnemyMelee(),
+      ),
+      EnemySpawner(
+        spawnPosition: Vector2(screenSize.x - 10, screenSize.y / 2),
+        spawnInterval: 2.0,
+        createEnemy: () => Enemy(),
+      ),
+      EnemySpawner(
+        spawnPosition: Vector2(0, screenSize.y / 2),
+        spawnInterval: 3.0,
+        createEnemy: () => Enemy(),
+      ),
     ]);
+    debugPrint("[MyGame] EnemySpawners added.");
 
+    // Call onLoadComplete after all essential async operations in onLoad are done
+    // and components are added.
     onLoadComplete?.call();
+    debugPrint("[MyGame] onLoad finished, onLoadComplete callback invoked.");
+  }
+
+  @override
+  void onMount() {
+    debugPrint("[MyGame] onMount started.");
+    super.onMount();
+    // Most initialization is now in onLoad.
+    // onMount is suitable for things that must happen after the game is in the widget tree
+    // but before the first update, if any.
+    // If `size` is critical for initial layout and not reliably set before/during `onLoad`,
+    // some component additions might be better here or in `onGameResize`.
+    // However, Flame usually guarantees `size` is available after `super.onLoad()`.
+    debugPrint("[MyGame] onMount finished.");
   }
 
   @override
@@ -81,25 +109,52 @@ class MyGame extends FlameGame with HasCollisionDetection {
     if (enemiesSpawned >= totalEnemiesToSpawn &&
         aliveEnemies == 0 &&
         player != null &&
-        !player.isDead) {
-      pauseEngine();
-      removeAll(children);
+        !player.isDead &&
+        !isNavigatingToGameOver) { // Prevent multiple navigation attempts
+      isNavigatingToGameOver = true; // Set flag
+      debugPrint("[MyGame] Victory Condition Met! Enemies Spawned: $enemiesSpawned, Alive Enemies: $aliveEnemies");
 
-      Future.delayed(const Duration(milliseconds: 300), () {
+      // Try to navigate first.
+      // Consider passing a specific navigation callback from MainGameScreen
+      // to make this cleaner and less reliant on MyGame holding a BuildContext.
+      // For now, we'll use the existing buildContext with checks.
+
+      Future.delayed(const Duration(milliseconds: 100), () { // Shortened delay
         if (buildContext.mounted) {
+          debugPrint("[MyGame] Navigating to GameOverScreen (Win).");
           Navigator.of(buildContext).pushReplacement(
             MaterialPageRoute(
               builder: (_) => const GameOverScreen(didWin: true),
             ),
-          );
+          ).then((_) {
+            // After navigation, then pause and clean up.
+            // This might be too late if navigation takes time or fails.
+            // A better pattern is often to show an overlay *within* the GameWidget managed by MyGame,
+            // and then have that overlay trigger navigation via a callback.
+            // For now, let's proceed with this slightly modified flow.
+            debugPrint("[MyGame] Navigation to GameOver (Win) complete. Pausing and cleaning up.");
+            pauseEngine();
+            removeAll(children.toList()); // Ensure we operate on a copy if modifying during iteration
+          }).catchError((e) {
+            debugPrint("[MyGame] Error during navigation to GameOver (Win): $e");
+            isNavigatingToGameOver = false; // Reset flag on error
+            // Optionally, try to pause/clean again or handle error
+          });
+        } else {
+          debugPrint("[MyGame] Victory: buildContext not mounted, cannot navigate.");
+          isNavigatingToGameOver = false; // Reset flag
         }
       });
     }
   }
 
+  bool isNavigatingToGameOver = false; // Add this flag
+
   @override
   void reset() async {
-    removeAll(children);
+    debugPrint("[MyGame] Resetting game.");
+    isNavigatingToGameOver = false; // Reset navigation flag
+    removeAll(children.toList()); // Use toList() to avoid issues if children list is modified during removal
     enemiesSpawned = 0;
 
     final sprite = await loadSprite('background.png');
@@ -136,5 +191,19 @@ class MyGame extends FlameGame with HasCollisionDetection {
         createEnemy: () => Enemy(),
       ),
     ]);
+  }
+
+  @override
+  void onRemove() {
+    debugPrint("[MyGame] onRemove called. Game is being detached.");
+    // Perform any specific cleanup for MyGame's resources here if needed.
+    // For example, if you manually started timers or streams that aren't
+    // Flame components, they might need to be cancelled/closed.
+    // ammoNotifier is a ValueNotifier. If it's not used elsewhere after the game
+    // is removed, it could be disposed here. However, if MainGameScreen might
+    // still listen to it briefly during transitions, defer disposal or ensure
+    // listeners are removed. Given it's part of MyGame, and MyGame is disposed
+    // with the screen state, it should be okay.
+    super.onRemove(); // Important to call super.onRemove()
   }
 }

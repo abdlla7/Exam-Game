@@ -15,15 +15,23 @@ class Player extends SpriteComponent with HasGameRef<MyGame>, CollisionCallbacks
 
   Player()
       : super(
-          size: Vector2(96, 96),
+          size: Vector2(96, 96), // Ensure this size is appropriate for your sprite
           anchor: Anchor.center,
         );
 
   @override
   Future<void> onLoad() async {
-    sprite = await gameRef.loadSprite('player.png');
+    debugPrint("[Player] onLoad started.");
+    try {
+      sprite = await gameRef.loadSprite('player.png');
+      debugPrint("[Player] Player sprite loaded successfully.");
+    } catch (e) {
+      debugPrint("[Player] Error loading player sprite: $e");
+      // Optionally, load a placeholder sprite or handle the error visually
+    }
     position = gameRef.size / 2;
     add(CircleHitbox());
+    debugPrint("[Player] Player hitbox added and position set to ${position}. onLoad finished.");
   }
 
   void shootNearestEnemy(MyGame game) {
@@ -67,19 +75,40 @@ class Player extends SpriteComponent with HasGameRef<MyGame>, CollisionCallbacks
   }
 
   void die() {
-    if (isDead) return;
+    if (isDead || gameRef.isNavigatingToGameOver) return; // Check gameRef flag too
 
     isDead = true;
-    removeFromParent();
+    gameRef.isNavigatingToGameOver = true; // Set game-level flag
+    debugPrint("[Player] Player died. Attempting to navigate to GameOverScreen (Lose).");
 
-    // ✅ ممكن تضيف انتقال إلى شاشة الخسارة هنا لو أردت
-    Future.delayed(const Duration(milliseconds: 300), () {
+    // It's generally safer for the game to handle its own removal or state changes
+    // rather than the player removing itself and then triggering navigation.
+    // However, for now, let's keep removeFromParent and see.
+    // A slight delay can help ensure the current game loop tick completes.
+    Future.delayed(const Duration(milliseconds: 50), () { // Shorter delay
+      try {
+        removeFromParent(); // Remove player from game
+      } catch (e) {
+        debugPrint("[Player] Error removing player from parent: $e");
+      }
+
       if (gameRef.buildContext.mounted) {
         Navigator.of(gameRef.buildContext).pushReplacement(
           MaterialPageRoute(
             builder: (_) => const GameOverScreen(didWin: false),
           ),
-        );
+        ).then((_) {
+          debugPrint("[Player] Navigation to GameOver (Lose) complete. Pausing game.");
+          gameRef.pauseEngine(); // Pause engine after navigation
+          // Game-level cleanup (like removing other entities) should ideally be handled in MyGame
+          // if further cleanup is needed post player death navigation.
+        }).catchError((e) {
+          debugPrint("[Player] Error during navigation to GameOver (Lose): $e");
+          gameRef.isNavigatingToGameOver = false; // Reset flag on error
+        });
+      } else {
+        debugPrint("[Player] Died: gameRef.buildContext not mounted, cannot navigate.");
+        gameRef.isNavigatingToGameOver = false; // Reset flag
       }
     });
   }
