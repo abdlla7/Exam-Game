@@ -192,4 +192,18 @@ class MyGame extends FlameGame with HasCollisionDetection {
       ),
     ]);
   }
+
+  @override
+  void onRemove() {
+    debugPrint("[MyGame] onRemove called. Game is being detached.");
+    // Perform any specific cleanup for MyGame's resources here if needed.
+    // For example, if you manually started timers or streams that aren't
+    // Flame components, they might need to be cancelled/closed.
+    // ammoNotifier is a ValueNotifier. If it's not used elsewhere after the game
+    // is removed, it could be disposed here. However, if MainGameScreen might
+    // still listen to it briefly during transitions, defer disposal or ensure
+    // listeners are removed. Given it's part of MyGame, and MyGame is disposed
+    // with the screen state, it should be okay.
+    super.onRemove(); // Important to call super.onRemove()
+  }
 }
