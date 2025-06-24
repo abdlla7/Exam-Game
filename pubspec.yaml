@@ -71,7 +71,6 @@ flutter:
     - assets/images/enemy_1.png
     - assets/images/enemy_2.png
     - assets/images/enemy_3.png
-    - assets/images/arabic.png
     - assets/images/background.png
     - assets/images/bullet_icon.png
     - assets/images/enemy_shoot_1.png
@@ -79,11 +78,9 @@ flutter:
     - assets/images/enemy_shoot_3.png
     - assets/images/enemy_white.png
     - assets/images/gun.png
-    - assets/images/history.png
     - assets/images/HomeHead.png
     - assets/images/lose.png
     - assets/images/win.png
-    - assets/images/science.png
     - assets/images/slime-attack-1.png
     - assets/images/slime-attack-2.png
     - assets/images/slime-attack-0.png
