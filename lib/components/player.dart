@@ -8,16 +8,20 @@ import 'bullet.dart';
 import 'enemy.dart';
 import 'slime.dart';
 
-class Player extends SpriteComponent with HasGameRef<MyGame>, CollisionCallbacks {
+class Player extends SpriteComponent
+    with HasGameRef<MyGame>, CollisionCallbacks {
   int ammo = 30;
   int health = 100;
   bool isDead = false;
 
   Player()
-      : super(
-          size: Vector2(96, 96), // Ensure this size is appropriate for your sprite
-          anchor: Anchor.center,
-        );
+    : super(
+        size: Vector2(
+          96,
+          96,
+        ), // Ensure this size is appropriate for your sprite
+        anchor: Anchor.center,
+      );
 
   @override
   Future<void> onLoad() async {
@@ -31,24 +35,34 @@ class Player extends SpriteComponent with HasGameRef<MyGame>, CollisionCallbacks
     }
     position = gameRef.size / 2;
     add(CircleHitbox());
-    debugPrint("[Player] Player hitbox added and position set to ${position}. onLoad finished.");
+    debugPrint(
+      "[Player] Player hitbox added and position set to $position. onLoad finished.",
+    );
   }
 
   void shootNearestEnemy(MyGame game) {
     if (ammo <= 0 || isDead) return;
 
-    final enemies = game.children.where((c) =>
-        (c is Enemy || c is EnemyMelee) &&
-        (c as PositionComponent).isMounted &&
-        !(c as dynamic).isDying);
+    final enemies = game.children.where(
+      (c) =>
+          (c is Enemy || c is EnemyMelee) &&
+          (c as PositionComponent).isMounted &&
+          !(c as dynamic).isDying,
+    );
 
     if (enemies.isEmpty) return;
 
-    final nearest = enemies.reduce((a, b) {
-      final distA = (a as PositionComponent).position.distanceTo(position);
-      final distB = (b as PositionComponent).position.distanceTo(position);
-      return distA < distB ? a : b;
-    }) as SpriteComponent;
+    final nearest =
+        enemies.reduce((a, b) {
+              final distA = (a as PositionComponent).position.distanceTo(
+                position,
+              );
+              final distB = (b as PositionComponent).position.distanceTo(
+                position,
+              );
+              return distA < distB ? a : b;
+            })
+            as SpriteComponent;
 
     final gun = RectangleComponent(
       size: Vector2(20, 10),
@@ -75,17 +89,21 @@ class Player extends SpriteComponent with HasGameRef<MyGame>, CollisionCallbacks
   }
 
   void die() {
-    if (isDead || gameRef.isNavigatingToGameOver) return; // Check gameRef flag too
+    if (isDead || gameRef.isNavigatingToGameOver)
+      return; // Check gameRef flag too
 
     isDead = true;
     gameRef.isNavigatingToGameOver = true; // Set game-level flag
-    debugPrint("[Player] Player died. Attempting to navigate to GameOverScreen (Lose).");
+    debugPrint(
+      "[Player] Player died. Attempting to navigate to GameOverScreen (Lose).",
+    );
 
     // It's generally safer for the game to handle its own removal or state changes
     // rather than the player removing itself and then triggering navigation.
     // However, for now, let's keep removeFromParent and see.
     // A slight delay can help ensure the current game loop tick completes.
-    Future.delayed(const Duration(milliseconds: 50), () { // Shorter delay
+    Future.delayed(const Duration(milliseconds: 50), () {
+      // Shorter delay
       try {
         removeFromParent(); // Remove player from game
       } catch (e) {
@@ -93,21 +111,30 @@ class Player extends SpriteComponent with HasGameRef<MyGame>, CollisionCallbacks
       }
 
       if (gameRef.buildContext.mounted) {
-        Navigator.of(gameRef.buildContext).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const GameOverScreen(didWin: false),
-          ),
-        ).then((_) {
-          debugPrint("[Player] Navigation to GameOver (Lose) complete. Pausing game.");
-          gameRef.pauseEngine(); // Pause engine after navigation
-          // Game-level cleanup (like removing other entities) should ideally be handled in MyGame
-          // if further cleanup is needed post player death navigation.
-        }).catchError((e) {
-          debugPrint("[Player] Error during navigation to GameOver (Lose): $e");
-          gameRef.isNavigatingToGameOver = false; // Reset flag on error
-        });
+        Navigator.of(gameRef.buildContext)
+            .pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const GameOverScreen(didWin: false),
+              ),
+            )
+            .then((_) {
+              debugPrint(
+                "[Player] Navigation to GameOver (Lose) complete. Pausing game.",
+              );
+              gameRef.pauseEngine(); // Pause engine after navigation
+              // Game-level cleanup (like removing other entities) should ideally be handled in MyGame
+              // if further cleanup is needed post player death navigation.
+            })
+            .catchError((e) {
+              debugPrint(
+                "[Player] Error during navigation to GameOver (Lose): $e",
+              );
+              gameRef.isNavigatingToGameOver = false; // Reset flag on error
+            });
       } else {
-        debugPrint("[Player] Died: gameRef.buildContext not mounted, cannot navigate.");
+        debugPrint(
+          "[Player] Died: gameRef.buildContext not mounted, cannot navigate.",
+        );
         gameRef.isNavigatingToGameOver = false; // Reset flag
       }
     });
